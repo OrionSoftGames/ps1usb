@@ -1,0 +1,31 @@
+PS1USB v1.0 by OrionSoft [2024]
+https://orionsoft.games/
+
+PS1USB is a development cartridge for the Playstation 1 allowing data transfer between your computer and your Playstation 1 over USB.
+This cartridge must be used with a USB mini-B cable and the provided "ps1transfer" tool available for Windows 32/64bits and Linux 64bits.
+
+The ps1transfer folder contains the source code of the tool running on your computer and used to transfer data over USB to the PS1USB cartridge.
+Linux coders must install libftdi1-dev (Under Debian: sudo apt-get install libftdi1-dev)
+I'm using CodeBlocks as a development environment, so I provide the corresponding ".cbp" project files for Linux and Windows.
+
+The ps1usb folder contains the source code for the PS1USB cartridge firmware.
+The firmware runs from RAM at address 0x801F6000.
+It is copied at boot from the cartridge ROM to RAM using https://github.com/JonathanDotCel/RomProd (see the "rom" folder)
+As the "LoadImage" function doesn't seems to work when loading data from the ROM space, and to save RAM space for user upload,
+I made a small file system for storing the TIM images in the ROM at address 0x1F010000.
+The the firmware boot, these TIM images are copied from ROM to RAM at address 0x80010000 then transfered in VRAM.
+At boot, before trashing the VRAM, I copy the entire VRAM content at the address 0x80020000 to 0x8011FFFF so that the ps1transfer tool can download VRAM data from this address using the "-v" command.
+
+The exception handler crash screen is taken from https://gist.github.com/impiaaa/2c97419435cad2f40fe8a495d696ec52
+and was modified to use a new 8x8 font (instead of the bios font), and print the CPU registers list and the crash Cause in plain ascii text.
+
+The transfer protocol is in the file "usb.h"
+I'm not an expert in this domain so, someone might code a faster protocol, if so, then feel free to send me patches, that's why the code is open source.
+
+If you want to add new features to this firmware, you can compile it at address 0x801D0000 and transfer it like a regular PS-X EXE.
+If you want me to add your new features to the production firmware/update, you can send me the patch to: orionsoft@free.fr
+
+This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+
+OrionSoft / June 2024
+

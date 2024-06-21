@@ -1,0 +1,52 @@
+PS1USB by OrionSoft [2024]
+https://orionsoft.games/
+
+PS1USB is a development cartridge for the Playstation 1 allowing data transfer between your computer and your Playstation 1 over USB.
+This cartridge must be used with a USB mini-B cable and the provided "ps1transfer" tool available for Windows 32/64bits and Linux 64bits.
+It is recommended to plug the USB cable to your computer whenever and before you boot your Playstation 1 with the cartridge in ON position.
+
+The ps1transfer tool must be executed with parameters in a command line environment.
+(under windows use "cmd" or "PowerShell", under Linux use a shell like "bash")
+Linux users must install libftdi1 (Under Debian: sudo apt-get install libftdi1)
+
+Parameters:
+-u Command to Upload a specified file from your computer to a specified address in the Playstation 1 memory.
+-d Command to Download a file from a specified address and size in the Playstation 1 memory to your computer in the specified file.
+-v Command to Download the Video RAM content of the Playstation 1 to a PNG image on your computer using the following parameters: x_position y_position width height
+-e Command to Transfer and Execute a specified Playstation 1 executable (PS-X EXE)
+-f Specify the file name on your computer
+-a Specify the target address in the Playstation 1 memory in hexadecimal
+-s Specify the size of the data to transfer in decimal (only for the Download "-d" command)
+-c Command to Switch in TTY console mode & PC file server after the "Execute" command.
+-p Specify the path of the files for the file server, require "-c" command.
+
+Developer notes:
+Transfered data are secured using a CRC8 checksum each 2kbytes packet.
+The available memory to upload your data or an executable in the Playstation 1 with PS1USB is from 0x80010000 to 0x801F5FFF included.
+A debugging screen with registers and stack dump will show up on your Playstation 1 whenever your program crash.
+The provided "libsn_usb.zip" is a library and an example to download files from your computer acting as a file server.
+You can deactivate the cartridge by toggling the top switch to off (right position),
+the Playstation 1 will then boot normally but the USB hardware will remain usable,
+once the Playstation 1 booted you can switch the cartridge back on to allow the flash chip to be updated by a custom program (for example if you bricked your cartridge).
+
+
+Usage examples:
+
+Upload and execute the Playstation 1 executable "program.ps-exe":
+ps1transfer -e -f program.ps-exe
+
+Upload and execute a Playstation 1 executable and redirect the "printf" text of your Playstation program to your computer:
+ps1transfer -c -e -f program.ps-exe
+
+Upload and execute a a program, redirect the "printf" text and specify the path "gamedata" for the program data files for the file server:
+ps1transfer -c -e -f program.ps-exe -p ./gamedata/
+
+Upload the file "data.bin" to the address 0x80100000 in the Playstation 1 ram:
+ps1transfer -u -f data.bin -a 0x80100000
+
+Download the bios memory from the Playstation 1 and save it to the file "bios.bin":
+ps1transfer -d -f bios.bin -a 0x1FC00000 -s 524288
+
+Download the entire Video RAM from the Playstation 1 and export it as a PNG image named "vram.png":
+ps1transfer -v 0 0 1024 512 -f vram.png
+

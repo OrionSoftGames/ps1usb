@@ -1,0 +1,2 @@
+This is the content of a file loaded from PC or CD.
+
