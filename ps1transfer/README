@@ -7,6 +7,7 @@ It is recommended to plug the USB cable to your computer whenever and before you
 
 The ps1transfer tool must be executed with parameters in a command line environment.
 (under windows use "cmd" or "PowerShell", under Linux use a shell like "bash")
+Windows users must install FTDI D2xx USB driver: https://ftdichip.com/wp-content/uploads/2021/08/CDM212364_Setup.zip
 Linux users must install libftdi1 (Under Debian: sudo apt-get install libftdi1)
 
 Parameters:

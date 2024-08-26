@@ -8,7 +8,7 @@ The ps1transfer folder contains the source code of the tool running on your comp
 Linux coders must install libftdi1-dev (Under Debian: sudo apt-get install libftdi1-dev)
 I'm using CodeBlocks as a development environment, so I provide the corresponding ".cbp" project files for Linux and Windows.
 
-The ps1usb folder contains the source code for the PS1USB cartridge firmware.
+The root folder contains the source code for the PS1USB cartridge firmware.
 The firmware runs from RAM at address 0x801F6000.
 It is copied at boot from the cartridge ROM to RAM using https://github.com/JonathanDotCel/RomProd (see the "rom" folder)
 As the "LoadImage" function doesn't seems to work when loading data from the ROM space, and to save RAM space for user upload,

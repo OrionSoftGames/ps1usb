@@ -256,7 +256,7 @@ bool	USB_Process(char cmd, uint8_t *data, uint32_t adrs, uint32_t size)
 void	PC_FileServer(void)
 {
 	uint8_t		*data, *ptr, answer, param[1+4+4+1];
-	uint32_t	data_size;
+	uint32_t	data_size, odata_size;
 	uint32_t	fd;
 	int			i;
 
@@ -269,7 +269,7 @@ void	PC_FileServer(void)
 			answer = 'B';	// Bad command
 
 		fd = (param[1] << 24) | (param[2] << 16) | (param[3] << 8) | param[4];
-		data_size = (param[5] << 24) | (param[6] << 16) | (param[7] << 8) | param[8];
+		odata_size = data_size = (param[5] << 24) | (param[6] << 16) | (param[7] << 8) | param[8];
 
 		// Send ACK
 		if (ftdi_write_data(ftdi, &answer, 1) != 1)
@@ -422,7 +422,7 @@ void	PC_FileServer(void)
 					{
 						if (PCdrvFD[fd])
 						{
-							ret_value = fwrite(data, 1, data_size, PCdrvFD[fd]);
+							ret_value = fwrite(data, 1, odata_size, PCdrvFD[fd]);
 						}
 					}
 				break;
