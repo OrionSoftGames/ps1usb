@@ -1,5 +1,5 @@
 /*
-* PS1USB firmware v1.0
+* PS1USB firmware v1.1
 * by OrionSoft [2024]
 * https://orionsoft.games/
 *
@@ -41,12 +41,53 @@ bool	PrintUSBStatus(void)
 }
 
 /****************************************/
+// I couldn't make this work
+
+char	*cd_region_check[] = {"for Eur", "for U/C", "for NET"};
+char	*cd_region_unlock[] = {"(Europe)", "of America", "World wide"};
+
+bool	CD_Unlock(void)
+{
+	uint8_t	getid_cmd[] = {0x22,0,0,0,0};
+	uint8_t	result[16];
+	int		i;
+
+	CdControl(0x19, getid_cmd, result);
+	CdSync(0, NULL);
+
+	for (i = 0; i < 3; i++)
+		if (!strncmp(result, cd_region_check[i], 7))
+			break;
+	if (i == 3)
+	{
+		PrintConsole("Error: CD Drive not compatible...");
+		return (false);
+	}
+
+	CdControl(0x50, NULL, NULL);
+	CdSync(0, NULL);
+	CdControl(0x51, "Licensed by", NULL);
+	CdSync(0, NULL);
+	CdControl(0x52, "Sony", NULL);
+	CdSync(0, NULL);
+	CdControl(0x53, "Computer", NULL);
+	CdSync(0, NULL);
+	CdControl(0x54, "Entertainment", NULL);
+	CdSync(0, NULL);
+	CdControl(0x55, cd_region_unlock[i], NULL);
+	CdSync(0, NULL);
+	CdControl(0x56, NULL, NULL);
+	CdSync(0, NULL);
+
+	return (true);
+}
 
 int main(void)
 {
 	int		size;
 	bool	usb_ok;
 	RECT	vram = {0, 0, 1024, 512};
+	u_long	pad;
 
 	ResetCallback();
 	PadInit(0);
@@ -74,15 +115,30 @@ int main(void)
 	LoadTexture((u_long*)0x80010000);
 
 	InitConsole();
-	PrintConsole("PS1 USB dev cartridge : firmware v1.0");
+	PrintConsole("PS1 USB dev cartridge : firmware v1.1");
 	PrintConsole("by OrionSoft [2024]");
 	PrintConsole("             https://orionsoft.games/");
+	pad = PadRead(1);
+	if (pad & (PADRdown | PADRright))	// X = Init CD
+	{
+/*
+		// I couldn't make this work
+		if (pad & PADRright)			// O = Unlock CD
+		{
+			PrintConsole("Unlocking CD drive...");
+			CdInit();
+			CD_Unlock();
+		}
+*/
+		PrintConsole("Initializing CD...");
+		_96_init();
+		PrintConsole("CD ready!");
+	}
 	usb_ok = PrintUSBStatus();
 
 	Init_CRC8();	// Copy CRC8 lookup table in Data Cache
 	while (1)
 	{
-		u_long	pad = PadRead(1);
 		int		ret;
 
 		// Handle USB cable plug/unplug status

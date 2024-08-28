@@ -1,4 +1,4 @@
-PS1USB v1.0 by OrionSoft [2024]
+PS1USB v1.1 by OrionSoft [2024]
 https://orionsoft.games/
 
 PS1USB is a development cartridge for the Playstation 1 allowing data transfer between your computer and your Playstation 1 over USB.
@@ -9,8 +9,8 @@ Linux coders must install libftdi1-dev (Under Debian: sudo apt-get install libft
 I'm using CodeBlocks as a development environment, so I provide the corresponding ".cbp" project files for Linux and Windows.
 
 The root folder contains the source code for the PS1USB cartridge firmware.
-The firmware runs from RAM at address 0x801F6000.
-It is copied at boot from the cartridge ROM to RAM using https://github.com/JonathanDotCel/RomProd (see the "rom" folder)
+The firmware runs from RAM at address 0x801F6000. (you will need to move this address back if you add new features, see the Makefile)
+It is copied at boot from the cartridge ROM to RAM using https://github.com/Lameguy64/PSn00bSDK/blob/master/examples/lowlevel/cartrom/ (see the "cartrom" folder)
 As the "LoadImage" function doesn't seems to work when loading data from the ROM space, and to save RAM space for user upload,
 I made a small file system for storing the TIM images in the ROM at address 0x1F010000.
 The the firmware boot, these TIM images are copied from ROM to RAM at address 0x80010000 then transfered in VRAM.
@@ -22,10 +22,18 @@ and was modified to use a new 8x8 font (instead of the bios font), and print the
 The transfer protocol is in the file "usb.h"
 I'm not an expert in this domain so, someone might code a faster protocol, if so, then feel free to send me patches, that's why the code is open source.
 
-If you want to add new features to this firmware, you can compile it at address 0x801D0000 and transfer it like a regular PS-X EXE.
+If you want to add new features to this firmware, you can compile it at address 0x801D0000 and transfer it like a regular PS-X EXE. (see Makefile)
 If you want me to add your new features to the production firmware/update, you can send me the patch to: orionsoft@free.fr
+
+You will need to modify the PSXDIR variable in each Makefile to your specific PSYQ SDK path on your system.
+
+If you want to make your own rom and flash it to your cartridge, be very careful as you might brick your cartridge!
+Go to the root folder and type make, then go to "cartrom" folder and type make, then go to "ar_flash" folder and type make.
+You can update the cartridge by transfering and executing the file ar_flash.ps-exe
+You can also update or unbrick your cartridge by executing the generated ar_flash.bin/ar_flash.cue cd image on a CD-R or CD emulator like xStation.
+(to do so, start your ps1 with the cartridge switch in OFF position, then boot the CD, and switch it back to ON position before flashing the cartridge)
 
 This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 
-OrionSoft / June 2024
+OrionSoft / June-August 2024
 
