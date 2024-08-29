@@ -66,6 +66,8 @@ header:
 	# Postboot vector
 	.word	0
 	.ascii	"PS1USB by   OrionSoft [2024]"
+
+	.org	0x80-32
 	.ascii	"This product is NOT            "
 
 	# Preboot vector
