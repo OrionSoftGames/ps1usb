@@ -12,15 +12,15 @@ if(UNIX)
     find_package(LibFTDI1 REQUIRED)
 endif()
 
-add_executable(ps1transfer
+add_executable(${PROJECT_NAME}
     main.c
     lodepng.c
 )
 
 if(WIN32)
-    target_link_libraries(ps1transfer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ftd2xx.lib)
-    target_compile_definitions(ps1transfer PRIVATE -D_CRT_SECURE_NO_WARNINGS)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/ftd2xx.lib)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE -D_CRT_SECURE_NO_WARNINGS)
 elseif(UNIX)
-    target_include_directories(ps1transfer PRIVATE /usr/include/libftdi1/)
-    target_link_libraries(ps1transfer PRIVATE ftdi1)
+    target_include_directories(${PROJECT_NAME} PRIVATE /usr/include/libftdi1/)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ftdi1)
 endif()
