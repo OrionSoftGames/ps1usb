@@ -14,7 +14,13 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#ifdef WIN32
+#include <io.h>
+#include <direct.h>
+#define chdir _chdir
+#else
 #include <unistd.h>
+#endif
 #include "lodepng.h"
 #include "crc.h"
 
@@ -456,7 +462,7 @@ pcdrvout:
 
 int main(int argc, char *argv[])
 {
-	int			x, y, w, h, i, ret, cmd = CMD_UNKNOWN;
+	int			x, y, w, h, i, cmd = CMD_UNKNOWN;
 	uint32_t	size = 0, adrs = 0x80010000, *ptr32;
 	uint16_t	*ptr16;
 	uint8_t		*data = NULL, *ptr;
@@ -472,6 +478,8 @@ int main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 #else
+	int ret;
+
 	if ((ftdi = ftdi_new()) == 0)
 	{
 		fprintf(stderr, "ftdi_new failed\n");
