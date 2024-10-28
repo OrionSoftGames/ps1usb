@@ -48,6 +48,9 @@ uint32_t	ftdi_write_data(FT_HANDLE handle, uint8_t *data, uint32_t size)
 #else
 #include <ftdi.h>
 struct ftdi_context *ftdi = NULL;
+
+#define	sleep_ms(ms)	usleep(ms * 1000)
+
 #endif
 
 /****************************************/
@@ -461,7 +464,7 @@ int main(int argc, char *argv[])
 	uint16_t	*ptr16;
 	uint8_t		*data = NULL, *ptr;
 	char		*filename = NULL, *path = NULL;
-	bool		ttymode = false;
+	bool		ttymode = false, reset = false;
 
 	printf("PS1USB Transfer tool v1.0 by OrionSoft [2024]\n\n");
 
@@ -505,6 +508,10 @@ int main(int argc, char *argv[])
 
 				case 'e':	// Execute psexe file
 					cmd = CMD_EXECUTE;
+				break;
+
+				case 'r':	// Reset the PS1
+					reset = true;
 				break;
 
 				case 'w':	// Flash Action Replay
@@ -568,7 +575,7 @@ int main(int argc, char *argv[])
 			goto usage;
 	}
 
-	if (!filename)
+	if (!filename && !reset)
 	{
 		printf("No file specified.\n");
 		goto usage;
@@ -579,6 +586,43 @@ int main(int argc, char *argv[])
 		data = SystemGetFile(filename, &size);
 		if (!data)
 			goto usage;
+	}
+
+	if (reset)
+	{
+		// Bug on Linux only (tested on Ubuntu 22.04 VM): sometimes an USB communication issue appears,
+		// ps1transfer displays "USB error." then exits when trying to execute a ps-exe file just after
+		// resetting (-r and -e options combined)
+		// On Windows, it works fine, the data upload seems to wait that USB becomes ready after reset
+
+		printf("Resetting the PS1...\n");
+		if (!USB_Process('R', NULL, 0, 0))
+#ifndef _WIN32
+			if (!USB_Process('R', NULL, 0, 0))	// Try another time just in case but sometimes it still fails on Linux
+#endif
+				goto USB_error;
+
+#ifndef _WIN32
+		// Closing and opening again the USB device seems to help but not in every case
+		if ((ret = ftdi_usb_close(ftdi)) < 0)
+		{
+			fprintf(stderr, "Unable to close USB device: %d (%s)\n", ret, ftdi_get_error_string(ftdi));
+			ftdi_free(ftdi);
+			return EXIT_FAILURE;
+		}
+
+		if ((ret = ftdi_usb_open(ftdi, 0x0403, 0x6001)) < 0)
+		{
+			fprintf(stderr, "Unable to open USB device: %d (%s)\n", ret, ftdi_get_error_string(ftdi));
+			ftdi_free(ftdi);
+			return EXIT_FAILURE;
+		}
+
+		// Wait some time for the USB communication to be ready again before executing a ps-exe file
+		// Otherwise, next transfers fail
+		if (cmd != CMD_UNKNOWN)
+			sleep_ms(1000);
+#endif
 	}
 
 	// Handle command
@@ -677,7 +721,8 @@ int main(int argc, char *argv[])
 		break;
 
 		default:
-			printf("No command specified.\n");
+			if (!reset)
+				printf("No command specified.\n");
 	}
 
 	goto done;
@@ -694,7 +739,8 @@ usage:
 	printf("\t-u Upload file to specified address\n");
 	printf("\t-d Download file from specified address and size\n");
 	printf("\t-v Download VRAM image from following parameters: x y w h\n");
-	printf("\t-e Execute psexe file\n");
+	printf("\t-e Execute psexe file (use -r if a program is already running)\n");
+	printf("\t-r Reset the PS1 (will be done first if combined with actions above)\n");
 	printf("\t-f file.bin\n");
 	printf("\t-a 0xAddress (hexadecimal address for download/upload)\n");
 	printf("\t-s size (size of download in decimal)\n");

@@ -10,11 +10,14 @@ The ps1transfer tool must be executed with parameters in a command line environm
 Windows users must install FTDI D2xx USB driver: https://ftdichip.com/wp-content/uploads/2021/08/CDM212364_Setup.zip
 Linux users must install libftdi1 (Under Debian: sudo apt-get install libftdi1)
 
+v1.2 update: New software reset feature and kernel_hook contributed by david4599 https://github.com/david4599/ps1usb/
+
 Parameters:
 -u Command to Upload a specified file from your computer to a specified address in the Playstation 1 memory.
 -d Command to Download a file from a specified address and size in the Playstation 1 memory to your computer in the specified file.
 -v Command to Download the Video RAM content of the Playstation 1 to a PNG image on your computer using the following parameters: x_position y_position width height
 -e Command to Transfer and Execute a specified Playstation 1 executable (PS-X EXE)
+-r Reset the PS1 (will be done first if combined with actions above)
 -f Specify the file name on your computer
 -a Specify the target address in the Playstation 1 memory in hexadecimal
 -s Specify the size of the data to transfer in decimal (only for the Download "-d" command)
@@ -35,6 +38,9 @@ Usage examples:
 
 Upload and execute the Playstation 1 executable "program.ps-exe":
 ps1transfer -e -f program.ps-exe
+
+Reset the Playstation 1 then Upload and execute "program2.ps-exe":
+ps1transfer -r -e -f program2.ps-exe
 
 Upload and execute a Playstation 1 executable and redirect the "printf" text of your Playstation program to your computer:
 ps1transfer -c -e -f program.ps-exe

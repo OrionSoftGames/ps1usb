@@ -1,0 +1,3 @@
+# Path to ABelliqueux's nolibgs_hello_worlds repository (https://github.com/ABelliqueux/nolibgs_hello_worlds/)
+# The root folder can be renamed as wanted e.g. psyq_sdk
+PSXDIR = /media/orion/Data/programmation/psx/psxdev/nolibgs_hello_worlds
