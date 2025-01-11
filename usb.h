@@ -9,17 +9,7 @@
 
 static struct EXEC	exe_header;
 
-#ifndef HOOK
-typedef struct
-{
-	bool	is_enabled;
-} KernelHookParams;
-
-// Kernel hook params are defined at the end of available reserved kernel space
-// The address can be decreased to get more room if needed
-// The linker script in the kernel_hook folder would need to be adjusted too
-static KernelHookParams	*kernel_hook_params = (KernelHookParams *)0x8000DF70;
-#endif
+void	SetupTTYhook(void);
 
 static const uint8_t CRC8_Tab[256] =
 {
@@ -51,22 +41,12 @@ static const uint8_t CRC8_Tab[256] =
 #define	USB_STATUS_MASK_CAN_SEND_DATA	(1 << 1)	// FT245R: TXE
 #define	USB_STATUS_MASK_USB_READY		(1 << 2)	// FT245R: PWREN
 
-#ifndef HOOK
 #define	DCACHE_ADRS	0x1F800000
 
 #define	Init_CRC8()			memcpy((volatile uint8_t *)DCACHE_ADRS, CRC8_Tab, sizeof(CRC8_Tab))
 #define	Fast_CRC8(_crc_)	*((volatile uint8_t *)(DCACHE_ADRS+(_crc_)))
-#else
-#define	Fast_CRC8(_crc_)	*((volatile uint8_t *)(CRC8_Tab+(_crc_)))
-#endif
 
-// Decreased timeout value in hook mode to avoid freezing programs for some time
-// trying to send printf messages if ps1transfer is not in console mode
-#ifndef HOOK
 #define	TIMEOUT_CNT		5000000
-#else
-#define	TIMEOUT_CNT		5000
-#endif
 #define	MAX_PACKET_SIZE	2048	// Please do not modify this value !
 
 enum
@@ -77,11 +57,6 @@ enum
 	USB_STATE_TIMEOUT,
 	USB_STATE_OK
 };
-
-void	ResetPS1(void)
-{
-	((void (*)())0xBFC00000)();
-}
 
 bool	USB_GetByte(volatile uint8_t *data)
 {
@@ -134,11 +109,7 @@ int		USB_Process(void)
 		return (USB_STATE_NONE);
 
 	// Check received command
-#ifndef HOOK
-	if (!((USB_cmd[0] == 'D') || (USB_cmd[0] == 'U') || (USB_cmd[0] == 'E') || (USB_cmd[0] == 'F') || (USB_cmd[0] == 'R')))
-#else
-	if (!(USB_cmd[0] == 'R'))
-#endif
+	if (!((USB_cmd[0] == 'D') || (USB_cmd[0] == 'U') || (USB_cmd[0] == 'E') || (USB_cmd[0] == 'F')))
 		return (USB_STATE_BAD_CMD);
 
 	crc = Fast_CRC8(0xFF ^ USB_cmd[0]);
@@ -166,7 +137,6 @@ int		USB_Process(void)
 	if (!USB_SendByte('G'))	// Good
 		return (USB_STATE_TIMEOUT);
 
-#ifndef HOOK
 	// Get Address pointer from packet
 	optr = ptr = (volatile uint8_t *)((USB_cmd[1] << 24) | (USB_cmd[2] << 16) | (USB_cmd[3] << 8) | USB_cmd[4]);
 	// Get Data size from packet
@@ -226,16 +196,10 @@ int		USB_Process(void)
 		PadStop();
 		ResetGraph(0);
 		StopCallback();
-
-		kernel_hook_params->is_enabled = true;
-
+		SetupTTYhook();
 		EnterCriticalSection();
 		Exec(&exe_header, 1, NULL);
 	}
-#endif
-
-	if (USB_cmd[0] == 'R')	// Reset
-		ResetPS1();
 
 	return (USB_STATE_OK);
 }
