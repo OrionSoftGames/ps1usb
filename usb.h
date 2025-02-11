@@ -8,8 +8,20 @@
 */
 
 static struct EXEC	exe_header;
+bool				is_usb_busy_sending;
 
-void	SetupTTYhook(void);
+#ifndef HOOK
+typedef struct
+{
+	bool	is_enabled;
+	int		(* p_USB_Process)(uint8_t cmd, uint32_t param, uint8_t *data, uint32_t size, uint32_t *ret);
+} KernelHookParams;
+
+// Kernel hook params are defined at the end of available reserved kernel space
+// The address can be decreased to get more room if needed
+// The linker script in the kernel_hook folder would need to be adjusted too
+static KernelHookParams	*kernel_hook_params = (KernelHookParams *)0x8000DF70;
+#endif
 
 static const uint8_t CRC8_Tab[256] =
 {
@@ -31,6 +43,17 @@ static const uint8_t CRC8_Tab[256] =
 	116, 42,200,150, 21, 75,169,247,182,232, 10, 84,215,137,107, 53
 };
 
+uint8_t		CRC8_Compute(uint8_t *data, uint32_t size)
+{
+	uint8_t	crc = 0xFF;
+
+	while (size--)
+		crc = CRC8_Tab[crc ^ (*data++)];
+
+	return (crc);
+}
+
+
 /****************************************/
 
 #define	USB_STATUS	*((volatile uint8_t *)0x1F060000)	// USB Status A17+A18
@@ -41,13 +64,27 @@ static const uint8_t CRC8_Tab[256] =
 #define	USB_STATUS_MASK_CAN_SEND_DATA	(1 << 1)	// FT245R: TXE
 #define	USB_STATUS_MASK_USB_READY		(1 << 2)	// FT245R: PWREN
 
+#ifndef HOOK
 #define	DCACHE_ADRS	0x1F800000
 
 #define	Init_CRC8()			memcpy((volatile uint8_t *)DCACHE_ADRS, CRC8_Tab, sizeof(CRC8_Tab))
 #define	Fast_CRC8(_crc_)	*((volatile uint8_t *)(DCACHE_ADRS+(_crc_)))
+#else
+#define	Fast_CRC8(_crc_)	*((volatile uint8_t *)(CRC8_Tab+(_crc_)))
+#endif
 
-#define	TIMEOUT_CNT		5000000
-#define	MAX_PACKET_SIZE	2048	// Please do not modify this value !
+// Decreased timeout value in hook mode to avoid freezing programs for some time
+// trying to send printf messages if ps1transfer is not in console mode
+// It seems that setting 0 as timeout value for sending data in hook mode is
+// perfectly fine (no transfer fails seen) and this causes no printf delay anymore
+#ifndef HOOK
+#define	TIMEOUT_CNT_SEND	5000000
+#else
+#define	TIMEOUT_CNT_SEND	0
+#endif
+
+#define	TIMEOUT_CNT_GET		5000000
+#define	MAX_PACKET_SIZE		2048	// Please do not modify this value !
 
 enum
 {
@@ -58,9 +95,14 @@ enum
 	USB_STATE_OK
 };
 
+void	ResetPS1(void)
+{
+	((void (*)())0xBFC00000)();
+}
+
 bool	USB_GetByte(volatile uint8_t *data)
 {
-	uint32_t	timeout = TIMEOUT_CNT;
+	uint32_t	timeout = TIMEOUT_CNT_GET;
 
 	if (USB_STATUS & USB_STATUS_MASK_USB_READY)
 		return (false);
@@ -85,7 +127,7 @@ bool	USB_GetByteNoTimeout(volatile uint8_t *data)
 
 bool	USB_SendByte(uint8_t data)
 {
-	uint32_t	timeout = TIMEOUT_CNT;
+	uint32_t	timeout = TIMEOUT_CNT_SEND;
 
 	if (USB_STATUS & USB_STATUS_MASK_USB_READY)
 		return (false);
@@ -98,18 +140,149 @@ bool	USB_SendByte(uint8_t data)
 	return (true);
 }
 
-int		USB_Process(void)
+bool	USB_SendData(volatile uint8_t *ptr, uint32_t size)
 {
-	uint8_t						crc, USB_cmd[1+4+4+1];
+	uint8_t						crc;
+	register uint32_t			lsize, olsize;
+
+	while (size)
+	{
+		olsize = lsize = (size > MAX_PACKET_SIZE) ? MAX_PACKET_SIZE : size;
+		crc = 0xFF;
+		while (lsize--)
+		{
+			crc = Fast_CRC8(crc ^ (*ptr));
+			if (!USB_SendByte(*ptr++))
+				return (false);
+		}
+		if (!USB_SendByte(crc))	// Send CRC of data
+			return (false);
+		if (!USB_GetByte(&crc))	// Wait ACK (Next block or retry ?)
+			return (false);
+		if (crc == 'N')	// Next
+			size -= olsize;
+		else			// Rewind
+			ptr -= olsize;
+	}
+
+	return (true);
+}
+
+bool	USB_GetData(volatile uint8_t *ptr, uint32_t size)
+{
+	uint8_t						crc;
+	register uint32_t			lsize, olsize;
+
+	while (size)
+	{
+		olsize = lsize = (size > MAX_PACKET_SIZE) ? MAX_PACKET_SIZE : size;
+		crc = 0xFF;
+		while (lsize--)
+		{
+			if (!USB_GetByte(ptr))
+				return (false);
+			crc = Fast_CRC8(crc ^ (*ptr++));
+		}
+		if (!USB_SendByte(crc))	// Send CRC of data
+			return (false);
+		if (!USB_GetByte(&crc))	// Wait ACK (Next block or retry ?)
+			return (false);
+		if (crc == 'N')	// Next
+			size -= olsize;
+		else			// Rewind
+			ptr -= olsize;
+	}
+
+	return (true);
+}
+
+int		USB_ProcessSend(uint8_t cmd, uint32_t param, uint8_t *data, uint32_t size, uint32_t *ret)
+{
+	uint8_t						USB_cmd[1+1+4+4+1];
+	register volatile uint8_t	*ptr;
+	int							i;
+
+	// Check if USB is connected
+	if (USB_STATUS & USB_STATUS_MASK_USB_READY)
+		return (false);
+
+	// Send a special char to PC to tells it to switch from TTY Console to Binary Data Transfer
+	USB_cmd[0] = 16;	// Data Link Escape
+	USB_cmd[1] = cmd;
+	USB_cmd[2] = (param >> 24) & 0xFF;
+	USB_cmd[3] = (param >> 16) & 0xFF;
+	USB_cmd[4] = (param >> 8) & 0xFF;
+	USB_cmd[5] = param & 0xFF;
+	USB_cmd[6] = (size >> 24) & 0xFF;
+	USB_cmd[7] = (size >> 16) & 0xFF;
+	USB_cmd[8] = (size >> 8) & 0xFF;
+	USB_cmd[9] = size & 0xFF;
+	USB_cmd[10] = CRC8_Compute(&USB_cmd[1], 1+4+4);
+
+	// Send command packet
+	for (i = 0; i < sizeof(USB_cmd); i++)
+		if (!USB_SendByte(USB_cmd[i]))
+			return (false);
+
+	// Wait ACK
+	if (!USB_GetByte(&USB_cmd[0]))
+		return (false);
+
+	// Check ACK
+	if (USB_cmd[0] != 'G')
+		return (false);
+
+	// Read/Write data
+	if (data)
+	{
+		// Read data from PC
+		ptr = data;
+		if (cmd == 'R')
+		{
+			if (!USB_GetData(ptr, size))
+				return (false);
+		}
+		else // Write data to PC
+		{
+			if (!USB_SendData(ptr, size))
+				return (false);
+		}
+	}
+
+	// Get Return value
+	i = 4;
+	ptr = USB_cmd;
+	while (i--)
+	{
+		if (!USB_GetByte(ptr))
+			return (false);
+		ptr++;
+	}
+	if (ret)
+		*ret = (USB_cmd[0] << 24) | (USB_cmd[1] << 16) | (USB_cmd[2] << 8) | USB_cmd[3];
+
+	return (true);
+}
+
+int		USB_ProcessReceive(void)
+{
+	uint8_t						USB_cmd[1+4+4+1];
+	uint8_t						crc;
 	register uint8_t			USB_index;
-	register volatile uint8_t	*ptr, *optr;
-	register uint32_t			size, lsize, olsize, osize;
+	register volatile uint8_t	*ptr;
+	register uint32_t			size;
+
+	if (is_usb_busy_sending)
+		return (USB_STATE_NONE);
 
 	if (!USB_GetByteNoTimeout(&USB_cmd[0]))
 		return (USB_STATE_NONE);
 
-	// Check received command
-	if (!((USB_cmd[0] == 'D') || (USB_cmd[0] == 'U') || (USB_cmd[0] == 'E') || (USB_cmd[0] == 'F')))
+#ifndef HOOK
+	if (!((USB_cmd[0] == 'D') || (USB_cmd[0] == 'U') || (USB_cmd[0] == 'E') || (USB_cmd[0] == 'F') || (USB_cmd[0] == 'R')))
+#else
+	if (!(USB_cmd[0] == 'R'))
+#endif
 		return (USB_STATE_BAD_CMD);
 
 	crc = Fast_CRC8(0xFF ^ USB_cmd[0]);
@@ -137,58 +310,25 @@ int		USB_Process(void)
 	if (!USB_SendByte('G'))	// Good
 		return (USB_STATE_TIMEOUT);
 
+#ifndef HOOK
 	// Get Address pointer from packet
-	optr = ptr = (volatile uint8_t *)((USB_cmd[1] << 24) | (USB_cmd[2] << 16) | (USB_cmd[3] << 8) | USB_cmd[4]);
+	ptr = (volatile uint8_t *)((USB_cmd[1] << 24) | (USB_cmd[2] << 16) | (USB_cmd[3] << 8) | USB_cmd[4]);
 	// Get Data size from packet
-	osize = size = (USB_cmd[5] << 24) | (USB_cmd[6] << 16) | (USB_cmd[7] << 8) | USB_cmd[8];
+	size = (USB_cmd[5] << 24) | (USB_cmd[6] << 16) | (USB_cmd[7] << 8) | USB_cmd[8];
 
 	// Download data (PS1 to Computer)
 	if (USB_cmd[0] == 'D')
 	{
-		while (size)
-		{
-			olsize = lsize = (size > MAX_PACKET_SIZE) ? MAX_PACKET_SIZE : size;
-			crc = 0xFF;
-			while (lsize--)
-			{
-				crc = Fast_CRC8(crc ^ (*ptr));
-				if (!USB_SendByte(*ptr++))
-					return (USB_STATE_TIMEOUT);
-			}
-			if (!USB_SendByte(crc))	// Send CRC of data
-				return (USB_STATE_TIMEOUT);
-			if (!USB_GetByte(&crc))	// Wait ACK (Next block or retry ?)
-				return (USB_STATE_TIMEOUT);
-			if (crc == 'N')	// Next
-				size -= olsize;
-			else			// Rewind
-				ptr -= olsize;
-		}
+		if (!USB_SendData(ptr, size))
+			return (USB_STATE_TIMEOUT);
 	}
 	else	// Upload data (Computer to PS1)
 	{
 		if (USB_cmd[0] == 'E')	// Execute command
-			optr = ptr = (volatile uint8_t *)&exe_header;
+			ptr = (volatile uint8_t *)&exe_header;
 
-		while (size)
-		{
-			olsize = lsize = (size > MAX_PACKET_SIZE) ? MAX_PACKET_SIZE : size;
-			crc = 0xFF;
-			while (lsize--)
-			{
-				if (!USB_GetByte(ptr))
-					return (USB_STATE_TIMEOUT);
-				crc = Fast_CRC8(crc ^ (*ptr++));
-			}
-			if (!USB_SendByte(crc))	// Send CRC of data
-				return (USB_STATE_TIMEOUT);
-			if (!USB_GetByte(&crc))	// Wait ACK (Next block or retry ?)
-				return (USB_STATE_TIMEOUT);
-			if (crc == 'N')	// Next
-				size -= olsize;
-			else			// Rewind
-				ptr -= olsize;
-		}
+		if (!USB_GetData(ptr, size))
+			return (USB_STATE_TIMEOUT);
 	}
 
 	if (USB_cmd[0] == 'E')	// Execute
@@ -196,10 +336,32 @@ int		USB_Process(void)
 		PadStop();
 		ResetGraph(0);
 		StopCallback();
-		SetupTTYhook();
+
+		kernel_hook_params->is_enabled = true;
+
 		EnterCriticalSection();
 		Exec(&exe_header, 1, NULL);
 	}
+#endif
+
+	if (USB_cmd[0] == 'R')	// Reset
+		ResetPS1();
 
 	return (USB_STATE_OK);
+}
+
+int		USB_Process(uint8_t cmd, uint32_t param, uint8_t *data, uint32_t size, uint32_t *ret)
+{
+	int res;
+
+	if (cmd)
+	{
+		is_usb_busy_sending = true;
+		res = USB_ProcessSend(cmd, param, data, size, ret);
+		is_usb_busy_sending = false;
+
+		return res;
+	}
+
+	return USB_ProcessReceive();
 }

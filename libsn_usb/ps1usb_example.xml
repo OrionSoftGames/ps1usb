@@ -2,7 +2,7 @@
 <iso_project image_name="ps1usb_example.bin" cue_sheet="ps1usb_example.cue" no_xa="0">
 <track type="data">
 <identifiers system="PLAYSTATION" application="PLAYSTATION" volume="PS1USB_EX" volume_set="PS1USB_EX" publisher="ORIONSOFT" data_preparer="ORIONSOFT" copyright="ORIONSOFT"/>
-<license file="licensee.dat"/>
+<license file="../config/LICENSEE.DAT"/>
 <directory_tree>
 <file name="SYSTEM.CNF" type="data" source="system.cnf"/>
 <file name="LOADEXMP.PSX" type="data" source="ps1usb_example.ps-exe"/>

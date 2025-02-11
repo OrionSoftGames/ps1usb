@@ -2,7 +2,7 @@
 <iso_project image_name="ar_flash.bin" cue_sheet="ar_flash.cue" no_xa="0">
 <track type="data">
 <identifiers system="PLAYSTATION" application="PLAYSTATION" volume="AR_FLASH" volume_set="AR_FLASH" publisher="ORIONSOFT" data_preparer="ORIONSOFT" copyright="ORIONSOFT"/>
-<license file="/media/orion/Data/programmation/psx/tools/mkpsxiso/licensee.dat"/>
+<license file="../config/LICENSEE.DAT"/>
 <directory_tree>
 <file name="SYSTEM.CNF" type="data" source="system.txt"/>
 <file name="AR_FLASH.PSX" type="data" source="ar_flash.ps-exe"/>

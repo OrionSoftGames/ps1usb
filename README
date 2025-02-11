@@ -1,4 +1,4 @@
-PS1USB v1.1 by OrionSoft [2024]
+PS1USB v1.4 by OrionSoft [2024-2025]
 https://orionsoft.games/
 
 PS1USB is a development cartridge for the Playstation 1 allowing data transfer between your computer and your Playstation 1 over USB.
@@ -9,7 +9,7 @@ Linux coders must install libftdi1-dev (Under Debian: sudo apt-get install libft
 I'm using CodeBlocks as a development environment, so I provide the corresponding ".cbp" project files for Linux and Windows.
 
 The root folder contains the source code for the PS1USB cartridge firmware.
-The firmware runs from RAM at address 0x801F6000. (you will need to move this address back if you add new features, see the Makefile)
+The firmware runs from RAM at address 0x801EF000. (you will need to move this address back if you add new features, see the Makefile)
 It is copied at boot from the cartridge ROM to RAM using https://github.com/Lameguy64/PSn00bSDK/blob/master/examples/lowlevel/cartrom/ (see the "cartrom" folder)
 As the "LoadImage" function doesn't seems to work when loading data from the ROM space, and to save RAM space for user upload,
 I made a small file system for storing the TIM images in the ROM at address 0x1F010000.
@@ -21,6 +21,8 @@ and was modified to use a new 8x8 font (instead of the bios font), and print the
 
 The transfer protocol is in the file "usb.h"
 I'm not an expert in this domain so, someone might code a faster protocol, if so, then feel free to send me patches, that's why the code is open source.
+
+v1.4 update: New software reset feature and kernel_hook contributed by david4599 https://github.com/david4599/ps1usb/
 
 If you want to add new features to this firmware, you can compile it at address 0x801D0000 and transfer it like a regular PS-X EXE. (see Makefile)
 If you want me to add your new features to the production firmware/update, you can send me the patch to: orionsoft@free.fr

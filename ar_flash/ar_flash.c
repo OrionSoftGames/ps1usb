@@ -97,8 +97,9 @@ int main(void)
 	int	i, size, y = 0;
 	volatile uint8_t *arptr;
 	uint8_t *ptr;
-
+retry:
 	ResetCallback();
+	PadInit(0);
 	InitDisplay();
 	LoadTexture(_binary_font_tim_start);
 
@@ -173,7 +174,9 @@ int main(void)
 			DrawText(0, y += 8, "Flash Error !");
 			htoa32(((uint32_t)arptr)-1, strbuffer);
 			DrawText(0, y += 8, strbuffer);
-			while (1);
+			DrawText(0, y += 8, "Press X to retry !");
+			while (!(PadRead(1) & PADRdown));
+			goto retry;
 		}
 	}
 	DrawText(0, y += 8, "Flashing is Good !");

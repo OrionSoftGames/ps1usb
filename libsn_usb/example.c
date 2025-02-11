@@ -107,7 +107,7 @@ int	DataManager_Load(char *filename, unsigned char *buffer)
 
 /****************************************/
 
-uint8_t	CD_sector[2048];	// Buffer must be multiple of 2048 whenever loading data from CD
+uint8_t	CD_sector[2048*150];	// Buffer must be multiple of 2048 whenever loading data from CD
 
 int main(void)
 {

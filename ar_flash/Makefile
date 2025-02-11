@@ -1,14 +1,24 @@
+include ../config/Makefile.conf
+
 TARGET = ar_flash
-PSXDIR = /media/orion/Data/programmation/psx/psxdev
 
 SRCS = $(TARGET).c font.tim ps1usb.rom
 CFLAGS = -Os
 
-include $(PSXDIR)/psyq_sdk/common.mk
+include $(PSXDIR)/common.mk
 
-all:
-	mkpsxiso -y -q ar_flash.xml
+
+all: $(TARGET).bin $(TARGET).cue
+
+$(TARGET).bin $(TARGET).cue: $(OBJS) $(TARGET).xml
+	mkpsxiso -y -q $(TARGET).xml
 
 %.o: %.rom
 	$(call OBJCOPYME)
+
+clean:
+	rm -f $(OBJS) $(BINDIR)Overlay.* $(BINDIR)*.elf $(BINDIR)*.ps-exe $(BINDIR)*.map $(BINDIR)$(TARGET).bin $(BINDIR)$(TARGET).cue $(DEPS)
+
+
+.PHONY: all clean
 

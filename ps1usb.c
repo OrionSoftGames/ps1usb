@@ -1,7 +1,9 @@
 /*
-* PS1USB firmware v1.1
-* by OrionSoft [2024]
+* PS1USB firmware v1.4
+* by OrionSoft [2024-2025]
 * https://orionsoft.games/
+*
+* Big thanks to david4599 for the reset feature and kernel hook !
 *
 * This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
 * If a copy of the MPL was not distributed with this file,
@@ -14,6 +16,7 @@
 #include <libetc.h>
 #include <libapi.h>
 #include <libcd.h>
+#include <libsnd.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
@@ -23,8 +26,18 @@
 #include "display.h"
 #include "usb.h"
 #include "tfs.h"
-#include "ttyhook.h"
-#include "exhandler.h"
+
+#define KERNEL_UNUSED_START	0x8000C000
+#define KERNEL_UNUSED_SIZE	0x2000
+#define KERNEL_HOOK_START	(KERNEL_UNUSED_START + 0x160)
+
+extern uint8_t	_binary_kernel_hook_bin_start[];
+extern uint32_t	*_binary_kernel_hook_bin_size;
+
+// Locations are hardcoded at the end of unused kernel space to make sure the original function addresses are valid
+// That way, the hooks can be uninstalled when testing a new PS1USB exe with new hooks (for cart development purposes)
+static uint32_t	*p_UnresolvedExceptionOld = (uint32_t *)0x8000DF78;
+static uint32_t	*p_ReturnFromExceptionOld = (uint32_t *)0x8000DF7C;
 
 /****************************************/
 
@@ -82,6 +95,43 @@ bool	CD_Unlock(void)
 	return (true);
 }
 
+/****************************************/
+
+static inline void	**GetB0Table(void)
+{
+	register volatile int n asm("t1") = 0x57;
+	__asm__ volatile("" : "=r"(n) : "r"(n));
+	return ((void **(*)(void))0xB0)();
+}
+
+void	KernelHooksUninstall(void)
+{
+	void	**a0table = (void **)0x200;
+	void	**b0table = GetB0Table();
+
+	// Addresses of original functions are less than 0x1000
+	// Addresses of hooked functions are in range KERNEL_UNUSED_START...KERNEL_UNUSED_START+KERNEL_UNUSED_SIZE
+	if ((uint32_t) a0table[0x40] >= KERNEL_UNUSED_START && (uint32_t) a0table[0x40] < KERNEL_UNUSED_START + KERNEL_UNUSED_SIZE)
+	{
+		a0table[0x40] = (void *) *p_UnresolvedExceptionOld;
+		printf("Kernel hooks: Old UnresolvedException uninstalled\n");
+	}
+
+	if ((uint32_t) b0table[0x17] >= KERNEL_UNUSED_START && (uint32_t) b0table[0x17] < KERNEL_UNUSED_START + KERNEL_UNUSED_SIZE)
+	{
+		b0table[0x17] = (void *) *p_ReturnFromExceptionOld;
+		printf("Kernel hooks: Old ReturnFromException uninstalled\n");
+	}
+}
+
+void	KernelHooksInstall(void)
+{
+	// Copy kernel hook installer to unused/reserved kernel space and launch it
+	memcpy((volatile uint8_t *)KERNEL_HOOK_START, _binary_kernel_hook_bin_start, &_binary_kernel_hook_bin_size);
+	((void (*)())KERNEL_HOOK_START)();
+	printf("Kernel hooks: Installed\n");
+}
+
 int main(void)
 {
 	int		size;
@@ -92,8 +142,14 @@ int main(void)
 	ResetCallback();
 	PadInit(0);
 	InitDisplay();
+	SsInit();
 
-	InstallExceptionHandler();
+	// Uninstall kernel hooks to prevent crashes due to overwriting if
+	// PS1USB firmware is ran from RAM after being booted from ROM
+	// (normally useful for PS1USB cartridge development only)
+	KernelHooksUninstall();
+
+	KernelHooksInstall();
 
 	// Save entire VRAM in RAM at boot (so the computer can download VRAM data)
 	StoreImage(&vram, (u_long*)0x80020000);
@@ -115,9 +171,22 @@ int main(void)
 	LoadTexture((u_long*)0x80010000);
 
 	InitConsole();
-	PrintConsole("PS1 USB dev cartridge : firmware v1.1");
-	PrintConsole("by OrionSoft [2024]");
+	PrintConsole("PS1 USB dev cartridge : firmware v1.4");
+	PrintConsole("by OrionSoft [2024-2025]");
 	PrintConsole("             https://orionsoft.games/");
+
+	// Enable CD IRQs
+	// Otherwise they are not enabled after CdInit() which will hang
+	// and timeout the first CD command but they will be enabled afterwards
+	// Intended behaviour? Or bug?
+	//
+	// For registers details and alternative implementation, see:
+	// https://problemkaputt.de/psx-spx.htm#cdromcontrollerioports
+	// https://github.com/Lameguy64/PSn00bSDK/blob/702bb601fb5712e2ae962a34b89204c646fe98f5/libpsn00b/psxcd/common.c#L217
+	*((volatile uint8_t *)0x1F801800) = 1;	// Index Register
+	*((volatile uint8_t *)0x1F801803) = 7;	// Interrupt Flag Register
+	*((volatile uint8_t *)0x1F801802) = 7;	// Interrupt Enable Register
+
 	pad = PadRead(1);
 	if (pad & (PADRdown | PADRright))	// X = Init CD
 	{
@@ -131,9 +200,10 @@ int main(void)
 		}
 */
 		PrintConsole("Initializing CD...");
-		_96_init();
+		CdInit();
 		PrintConsole("CD ready!");
 	}
+
 	usb_ok = PrintUSBStatus();
 
 	Init_CRC8();	// Copy CRC8 lookup table in Data Cache
@@ -164,7 +234,7 @@ int main(void)
 
 		if (usb_ok)
 		{
-			ret = USB_Process();
+			ret = USB_Process(0, 0, NULL, 0, NULL);
 
 			switch (ret)
 			{
