@@ -34,6 +34,21 @@ the Playstation 1 will then boot normally but the USB hardware will remain usabl
 once the Playstation 1 booted you can switch the cartridge back on to allow the flash chip to be updated by a custom program (for example if you bricked your cartridge).
 
 
+Net Yaroze compatibility:
+You can upload Net Yaroze executable to your PS1 using the PS1USB cartridge, you just need to get the "libps.exe" file from your Net Yaroze CD-ROM and strip its 2048 bytes exe header to raw data.
+Linux command: dd bs=1 skip=2048 if=libps.exe of=libps.bin
+
+Then convert your Net Yaroze COFF exe to standard PS-X EXE using the tool "eco2exe"
+Command: eco2exe -p main.exe
+
+Then upload libps.bin to 0x80010000 and upload/execute your main executable on the PS1USB cartridge:
+ps1transfer -u -f libps.bin -a 0x80010000
+ps1transfer -e -f main.exe
+
+Any "local dload" commands from your batch transfer file can be adapted like this:
+local dload bullet2.tim 800e4000 => ps1transfer -u -f bullet2.tim -a 0x800e4000
+
+
 Usage examples:
 
 Upload and execute the Playstation 1 executable "program.ps-exe":
