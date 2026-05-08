@@ -4,6 +4,8 @@ https://orionsoft.games/
 PS1USB is a development cartridge for the Playstation 1 allowing data transfer between your computer and your Playstation 1 over USB.
 This cartridge must be used with a USB mini-B cable and the provided "ps1transfer" tool available for Windows 32/64bits and Linux 64bits.
 
+Order the cartridge here: https://orionsoft.games/ps1usb/ps1usb.htm
+
 The ps1transfer folder contains the source code of the tool running on your computer and used to transfer data over USB to the PS1USB cartridge.
 Linux coders must install libftdi1-dev (Under Debian: sudo apt-get install libftdi1-dev)
 I'm using CodeBlocks as a development environment, so I provide the corresponding ".cbp" project files for Linux and Windows.
@@ -13,7 +15,7 @@ The firmware runs from RAM at address 0x801EF000. (you will need to move this ad
 It is copied at boot from the cartridge ROM to RAM using https://github.com/Lameguy64/PSn00bSDK/blob/master/examples/lowlevel/cartrom/ (see the "cartrom" folder)
 As the "LoadImage" function doesn't seems to work when loading data from the ROM space, and to save RAM space for user upload,
 I made a small file system for storing the TIM images in the ROM at address 0x1F010000.
-The the firmware boot, these TIM images are copied from ROM to RAM at address 0x80010000 then transfered in VRAM.
+When the firmware boot, these TIM images are copied from ROM to RAM at address 0x80010000 then transfered in VRAM.
 At boot, before trashing the VRAM, I copy the entire VRAM content at the address 0x80020000 to 0x8011FFFF so that the ps1transfer tool can download VRAM data from this address using the "-v" command.
 
 The exception handler crash screen is taken from https://gist.github.com/impiaaa/2c97419435cad2f40fe8a495d696ec52
