@@ -4,7 +4,8 @@ https://orionsoft.games/
 PS1USB is a development cartridge for the Playstation 1 allowing data transfer between your computer and your Playstation 1 over USB.
 This cartridge must be used with a USB mini-B cable and the provided "ps1transfer" tool available for Windows 32/64bits and Linux 64bits.
 
-Order the cartridge here: https://orionsoft.games/ps1usb/ps1usb.htm
+More info on the project here: https://orionsoft.games/ps1usb/ps1usb.htm
+Purchase the cartridge manufacturing files: https://orionsoft.itch.io/ps1-usb
 
 The ps1transfer folder contains the source code of the tool running on your computer and used to transfer data over USB to the PS1USB cartridge.
 Linux coders must install libftdi1-dev (Under Debian: sudo apt-get install libftdi1-dev)
